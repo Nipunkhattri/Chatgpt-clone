@@ -5,7 +5,6 @@
   --foreground: #ececec;
 }
 
-/* Theme variables */
 :root {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -13,7 +12,6 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark theme for ChatGPT-like appearance */
 .dark {
   --background: #202123;
   --foreground: #ececec;
@@ -25,7 +23,6 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
-/* Custom scrollbar for dark theme */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -43,7 +40,6 @@ body {
   background: #667084;
 }
 
-/* Hide scrollbar for webkit browsers */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -53,7 +49,6 @@ body {
   scrollbar-width: none;
 }
 
-/* Chat message animations */
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -69,7 +64,6 @@ body {
   animation: slideIn 0.3s ease-out;
 }
 
-/* Loading dots animation */
 @keyframes pulse {
   0%, 70%, 100% {
     opacity: 0.4;
@@ -91,7 +85,6 @@ body {
   animation-delay: -0.16s;
 }
 
-/* Code block styling */
 pre {
   background: #2d3748 !important;
   border-radius: 8px;
@@ -104,7 +97,6 @@ code {
   font-family: var(--font-geist-mono), 'Courier New', monospace;
 }
 
-/* Custom focus styles */
 textarea:focus,
 input:focus {
   outline: none;

@@ -10,6 +10,7 @@ import {
 import { cn } from '@/app/lib/utils';
 import MessageComponent from '@/app/components/message';
 import ThinkingDots from '@/app/components/thinking-dots';
+import SkeletonLoader from '@/app/components/skeleton-loader';
 
 interface UIMessage {
   _id: string;
@@ -33,6 +34,8 @@ interface ChatInterfaceProps {
   onChatTitleUpdate: (title: string) => void;
   onToggleSidebar: () => void;
   onChatListRefresh?: () => void;
+  isChatLoading?: boolean;
+  onChatLoadingComplete?: () => void;
 }
 
 export default function ChatInterface({
@@ -40,12 +43,15 @@ export default function ChatInterface({
   onChatTitleUpdate,
   onToggleSidebar,
   onChatListRefresh,
+  isChatLoading = false,
+  onChatLoadingComplete,
 }: ChatInterfaceProps) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<{id: string, name: string, size: number}[]>([]);
+  const [deletingFiles, setDeletingFiles] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -63,8 +69,11 @@ export default function ChatInterface({
     } else {
       setAiMessages([]);
       setUploadedFiles([]);
+      onChatLoadingComplete?.();
     }
     setUploadingFiles([]);
+    setDeletingFiles([]);
+    setError(null);
   }, [chatId]);
 
   useEffect(() => {
@@ -124,6 +133,7 @@ export default function ChatInterface({
       console.error('Error loading messages:', error);
     } finally {
       setIsLoadingMessages(false);
+      onChatLoadingComplete?.();
     }
   };
 
@@ -220,6 +230,9 @@ export default function ChatInterface({
   };
 
   const handleFileDelete = async (fileId: string) => {
+    setDeletingFiles(prev => [...prev, fileId]);
+    setError(null);
+
     try {
       const response = await fetch('/api/upload', {
         method: 'DELETE',
@@ -231,11 +244,16 @@ export default function ChatInterface({
 
       if (response.ok) {
         setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+        setDeletingFiles(prev => prev.filter(id => id !== fileId));
       } else {
         console.error('Failed to delete file');
+        setError(new Error('Failed to delete file. Please try again.'));
+        setDeletingFiles(prev => prev.filter(id => id !== fileId));
       }
     } catch (error) {
       console.error('Error deleting file:', error);
+      setError(error instanceof Error ? error : new Error('An error occurred while deleting the file.'));
+      setDeletingFiles(prev => prev.filter(id => id !== fileId));
     }
   };
 
@@ -404,7 +422,8 @@ export default function ChatInterface({
       <div className="flex items-center justify-between p-4 border-b border-[#2f2f2f]">
         <button
           onClick={onToggleSidebar}
-          className="p-2 hover:bg-[#2f2f2f] rounded-md"
+          className="p-2 hover:bg-[#2f2f2f] rounded-md text-gray-300 hover:text-white transition-colors"
+          title="Toggle sidebar"
         >
           <Menu size={20} />
         </button>
@@ -429,10 +448,8 @@ export default function ChatInterface({
       </div>
 
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto relative">
-        {isLoadingMessages ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-gray-400">Loading messages...</div>
-          </div>
+        {(isLoadingMessages || isChatLoading) ? (
+          <SkeletonLoader type="chat" count={4} />
         ) : aiMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-4">
             <div className="text-center max-w-4xl mx-auto">
@@ -518,27 +535,53 @@ export default function ChatInterface({
                   </div>
                 ))}
                 
-                {uploadedFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center gap-2 bg-[#2f2f2f] rounded-lg px-3 py-2 text-sm"
-                  >
-                    {getFileIcon(file.fileType)}
-                    <span className="text-gray-300 max-w-[150px] truncate">
-                      {file.fileName}
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                      {formatFileSize(file.fileSize)}
-                    </span>
-                    {getStatusIcon(file.status)}
-                    <button
-                      onClick={() => handleFileDelete(file.id)}
-                      className="ml-1 text-gray-400 hover:text-white transition-colors"
+                {uploadedFiles.map((file) => {
+                  const isDeleting = deletingFiles.includes(file.id);
+                  return (
+                    <div
+                      key={file.id}
+                      className={cn(
+                        "flex items-center gap-2 bg-[#2f2f2f] rounded-lg px-3 py-2 text-sm",
+                        isDeleting && "opacity-60 animate-pulse border border-red-500/30"
+                      )}
                     >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
+                      {getFileIcon(file.fileType)}
+                      <span className="text-gray-300 max-w-[150px] truncate">
+                        {file.fileName}
+                      </span>
+                      <span className="text-gray-500 text-xs">
+                        {formatFileSize(file.fileSize)}
+                      </span>
+                      {isDeleting ? (
+                        <div className="flex items-center gap-1">
+                          <Loader2 size={12} className="animate-spin text-red-400" />
+                          <span className="text-red-400 text-xs font-medium">
+                            Deleting...
+                          </span>
+                        </div>
+                      ) : (
+                        getStatusIcon(file.status)
+                      )}
+                      <button
+                        onClick={() => handleFileDelete(file.id)}
+                        disabled={isDeleting}
+                        className={cn(
+                          "ml-1 transition-colors",
+                          isDeleting
+                            ? "text-gray-600 cursor-not-allowed"
+                            : "text-gray-400 hover:text-white"
+                        )}
+                        title={isDeleting ? "Deleting..." : "Delete file"}
+                      >
+                        {isDeleting ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <X size={14} />
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

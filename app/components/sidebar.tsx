@@ -145,8 +145,8 @@ export default function Sidebar({
       
       <div
         className={cn(
-          "fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#171717] border-r border-[#2f2f2f] transform transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          "fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#171717] border-r border-[#2f2f2f] transform transition-transform duration-300 ease-in-out md:translate-x-0",
+          isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
@@ -161,9 +161,9 @@ export default function Sidebar({
               </div>
               <button
                 onClick={onToggle}
-                className="p-1.5 hover:bg-[#2f2f2f] rounded-md md:hidden"
+                className="md:hidden p-1 text-gray-400 hover:text-white hover:bg-[#2f2f2f] rounded-md transition-colors"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
             

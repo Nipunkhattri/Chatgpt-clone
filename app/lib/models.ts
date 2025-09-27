@@ -1,6 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-// User interface
 export interface IUser extends Document {
   clerkId: string;
   email: string;
@@ -11,7 +10,6 @@ export interface IUser extends Document {
   updatedAt: Date;
 }
 
-// Chat interface
 export interface IChat extends Document {
   _id: string;
   userId: string;
@@ -20,7 +18,6 @@ export interface IChat extends Document {
   updatedAt: Date;
 }
 
-// Message interface
 export interface IMessage extends Document {
   _id: string;
   chatId: mongoose.Types.ObjectId;
@@ -40,13 +37,12 @@ export interface IFile extends Document {
   cloudinaryPublicId: string;
   status: 'uploading' | 'processing' | 'completed' | 'failed';
   extractedText?: string;
-  vectorIndexId?: string; // Pinecone namespace or index reference
+  vectorIndexId?: string;
   error?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-// User Schema
 const UserSchema = new Schema<IUser>({
   clerkId: {
     type: String,
@@ -71,7 +67,6 @@ const UserSchema = new Schema<IUser>({
   timestamps: true,
 });
 
-// Chat Schema
 const ChatSchema = new Schema<IChat>({
   userId: {
     type: String,
@@ -87,7 +82,6 @@ const ChatSchema = new Schema<IChat>({
   timestamps: true,
 });
 
-// Message Schema
 const MessageSchema = new Schema<IMessage>({
   chatId: {
     type: Schema.Types.ObjectId,
@@ -156,14 +150,12 @@ const FileSchema = new Schema<IFile>({
   timestamps: true,
 });
 
-// Create indexes for better performance
 ChatSchema.index({ userId: 1, createdAt: -1 });
 MessageSchema.index({ chatId: 1, createdAt: 1 });
 
 FileSchema.index({ userId: 1, createdAt: -1 });
 FileSchema.index({ chatId: 1, createdAt: -1 });
 
-// Export models
 export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 export const Chat = mongoose.models.Chat || mongoose.model<IChat>('Chat', ChatSchema);
 export const Message = mongoose.models.Message || mongoose.model<IMessage>('Message', MessageSchema);

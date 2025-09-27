@@ -2,22 +2,52 @@
 
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { useRouter, useParams } from 'next/navigation';
 import { IChat } from '@/app/lib/models';
 import Sidebar from './sidebar';
-import ChatInterface from './chat-interface';   
+import ChatInterface from './chat-interface';
+import WelcomeScreen from './welcome-screen';   
 
-export default function ChatLayout() {
+interface ChatLayoutProps {
+  initialChatId?: string;
+}
+
+export default function ChatLayout({ initialChatId }: ChatLayoutProps) {
   const { user, isLoaded } = useUser();
+  const router = useRouter();
+  const params = useParams();
   const [chats, setChats] = useState<IChat[]>([]);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(initialChatId || null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasNoChats, setHasNoChats] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const isDesktop = window.innerWidth >= 768;
+      setSidebarOpen(isDesktop);
+    };
+
+    checkScreenSize();
+
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   useEffect(() => {
     if (isLoaded && user) {
       loadChats();
     }
   }, [isLoaded, user]);
+
+  useEffect(() => {
+    const newChatId = params?.chatId as string;
+    if (newChatId && newChatId !== currentChatId) {
+      setIsChatLoading(true);
+      setCurrentChatId(newChatId);
+    }
+  }, [params?.chatId, currentChatId]);
 
   const loadChats = async () => {
     if (!user) return;
@@ -28,8 +58,24 @@ export default function ChatLayout() {
         const userChats = await response.json();
         setChats(userChats);
         
-        if (!currentChatId && userChats.length > 0) {
-          setCurrentChatId(userChats[0]._id);
+        if (userChats.length === 0) {
+          setHasNoChats(true);
+          setCurrentChatId(null);
+        } else {
+          setHasNoChats(false);
+          
+          if (initialChatId) {
+            const chatExists = userChats.some((chat: IChat) => chat._id === initialChatId);
+            if (chatExists) {
+              setCurrentChatId(initialChatId);
+            } else {
+              router.replace(`/chat/${userChats[0]._id}`);
+              return;
+            }
+          } else if (!initialChatId) {
+            router.replace(`/chat/${userChats[0]._id}`);
+            return;
+          }
         }
       }
     } catch (error) {
@@ -41,6 +87,7 @@ export default function ChatLayout() {
 
   const createNewChat = async () => {
     try {
+      setIsChatLoading(true); 
       const response = await fetch('/api/chats', {
         method: 'POST',
         headers: {
@@ -52,10 +99,11 @@ export default function ChatLayout() {
       if (response.ok) {
         const newChat = await response.json();
         setChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newChat._id);
+        router.push(`/chat/${newChat._id}`);
       }
     } catch (error) {
       console.error('Error creating new chat:', error);
+      setIsChatLoading(false); 
     }
   };
 
@@ -66,11 +114,15 @@ export default function ChatLayout() {
       });
 
       if (response.ok) {
-        setChats(prev => prev.filter(chat => chat._id !== chatId));
+        const updatedChats = chats.filter(chat => chat._id !== chatId);
+        setChats(updatedChats);
         
         if (currentChatId === chatId) {
-          const remainingChats = chats.filter(chat => chat._id !== chatId);
-          setCurrentChatId(remainingChats.length > 0 ? remainingChats[0]._id : null);
+          if (updatedChats.length > 0) {
+            router.push(`/chat/${updatedChats[0]._id}`);
+          } else {
+            router.push('/');
+          }
         }
       }
     } catch (error) {
@@ -101,7 +153,14 @@ export default function ChatLayout() {
     }
   };
 
-  if (!isLoaded || isLoading) {
+  const handleChatSelect = (chatId: string) => {
+    if (chatId !== currentChatId) {
+      setIsChatLoading(true);
+    }
+    router.push(`/chat/${chatId}`);
+  };
+
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-[#212121] flex items-center justify-center">
         <div className="text-center">
@@ -124,7 +183,7 @@ export default function ChatLayout() {
       <Sidebar
         chats={chats}
         currentChatId={currentChatId}
-        onChatSelect={setCurrentChatId}
+        onChatSelect={handleChatSelect}
         onNewChat={createNewChat}
         onDeleteChat={deleteChat}
         onUpdateChatTitle={updateChatTitle}
@@ -142,6 +201,8 @@ export default function ChatLayout() {
           }}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onChatListRefresh={loadChats}
+          isChatLoading={isChatLoading}
+          onChatLoadingComplete={() => setIsChatLoading(false)}
         />
       </main>
     </div>

@@ -1,7 +1,7 @@
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { CSVLoader } from '@langchain/community/document_loaders/fs/csv';
-import Tesseract from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
 
 export interface ExtractedContent {
   text: string;
@@ -178,10 +178,17 @@ async function extractFromCSV(buffer: ArrayBuffer): Promise<ExtractedContent> {
 
 async function extractFromImage(imageUrl: string): Promise<ExtractedContent> {
   try {
-   
-    const result = await Tesseract.recognize(imageUrl, 'eng', {
+    console.log('Starting OCR processing for image:', imageUrl);
+    
+    const worker = await createWorker('eng', 1, {
       logger: (m) => console.log('OCR Progress:', m),
     });
+    
+    const result = await worker.recognize(imageUrl);
+    
+    await worker.terminate();
+    
+    console.log('OCR completed successfully');
     
     return {
       text: result.data.text,
@@ -192,7 +199,7 @@ async function extractFromImage(imageUrl: string): Promise<ExtractedContent> {
     };
   } catch (error) {
     console.error('Error in OCR processing:', error);
-    throw error;
+    throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -237,7 +244,7 @@ export async function processFileInBackground(
       
     await File.findByIdAndUpdate(fileId, {
       status: 'completed',
-      extractedText: extractedContent.text.substring(0, 5000), // Store first 5000 chars for preview
+      extractedText: extractedContent.text.substring(0, 5000),
       vectorIndexId: namespace,
     });
     
@@ -248,7 +255,6 @@ export async function processFileInBackground(
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Update file record with error
     try {
       await File.findByIdAndUpdate(fileId, {
         status: 'failed',
