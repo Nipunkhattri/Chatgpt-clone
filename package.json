@@ -8,16 +8,49 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/groq": "^2.0.21",
+    "@ai-sdk/openai": "^2.0.34",
+    "@ai-sdk/react": "^2.0.51",
+    "@clerk/nextjs": "^6.32.2",
+    "@langchain/community": "^0.3.56",
+    "@langchain/core": "^0.3.77",
+    "@langchain/openai": "^0.6.13",
+    "@pinecone-database/pinecone": "^6.1.2",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@types/formidable": "^3.4.5",
+    "@types/sharp": "^0.31.1",
+    "@types/uuid": "^10.0.0",
+    "ai": "^5.0.51",
+    "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.7.0",
+    "clsx": "^2.1.1",
+    "csv-parser": "^3.2.0",
+    "date-fns": "^4.1.0",
+    "formidable": "^3.5.4",
+    "langchain": "^0.3.34",
+    "lucide-react": "^0.544.0",
+    "mammoth": "^1.11.0",
+    "mem0ai": "^2.1.38",
+    "mongoose": "^8.18.2",
+    "multer": "^2.0.2",
+    "next": "15.5.4",
+    "pdf-parse": "^1.1.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "react-dropzone": "^14.3.8",
+    "sharp": "^0.34.4",
+    "tailwind-merge": "^3.3.1",
+    "tesseract.js": "^6.0.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

@@ -1,26 +1,217 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #202123;
+  --foreground: #ececec;
 }
 
-@theme inline {
+/* Theme variables */
+:root {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Dark theme for ChatGPT-like appearance */
+.dark {
+  --background: #202123;
+  --foreground: #ececec;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #202123;
+  color: #ececec;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #667084;
+}
+
+/* Hide scrollbar for webkit browsers */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Chat message animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-appear {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Loading dots animation */
+@keyframes pulse {
+  0%, 70%, 100% {
+    opacity: 0.4;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+.loading-dot {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.loading-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+/* Code block styling */
+pre {
+  background: #2d3748 !important;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+code {
+  font-family: var(--font-geist-mono), 'Courier New', monospace;
+}
+
+/* Custom focus styles */
+textarea:focus,
+input:focus {
+  outline: none;
+}
+
+/* ChatGPT-like input box styling */
+.chatgpt-input {
+  background: #2f2f2f;
+  border: 1px solid #4f4f4f;
+  border-radius: 24px;
+  transition: border-color 0.2s ease;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+}
+
+.chatgpt-input:hover {
+  border-color: #6f6f6f;
+}
+
+.chatgpt-input:focus-within {
+  border-color: #6f6f6f;
+  box-shadow: 0 0 0 1px #6f6f6f;
+}
+
+.chatgpt-input textarea {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: white;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.chatgpt-input textarea::placeholder {
+  color: #8e8ea0;
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Scroll to bottom button styling */
+.scroll-to-bottom-btn {
+  background: rgba(47, 47, 47, 0.9);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(79, 79, 79, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.scroll-to-bottom-btn:hover {
+  background: rgba(63, 63, 63, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* SQL Syntax Highlighting */
+.sql-highlight {
+  color: #ffffff;
+}
+
+.sql-highlight .keyword {
+  color: #569cd6;
+  font-weight: 500;
+}
+
+.sql-highlight .string {
+  color: #ce9178;
+}
+
+.sql-highlight .identifier {
+  color: #ffffff;
+}
+
+/* Apply syntax highlighting to SQL keywords */
+.sql-highlight {
+  color: #ffffff;
+}
+
+/* Highlight SQL keywords */
+.sql-highlight {
+  color: #ffffff;
+}
+
+/* Custom SQL syntax highlighting */
+pre code.sql-highlight {
+  color: #ffffff;
+}
+
+pre code.sql-highlight .keyword {
+  color: #569cd6;
+  font-weight: 500;
+}
+
+pre code.sql-highlight .string {
+  color: #ce9178;
+}
+
+pre code.sql-highlight .identifier {
+  color: #ffffff;
+}
+
+/* Inline code styling */
+code:not(.sql-highlight) {
+  background: #2d2d2d;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'Courier New', monospace;
 }
