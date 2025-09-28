@@ -1,7 +1,6 @@
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
 import { CSVLoader } from '@langchain/community/document_loaders/fs/csv';
-import { createWorker } from 'tesseract.js';
 
 export interface ExtractedContent {
   text: string;
@@ -42,7 +41,7 @@ export async function extractTextFromFile(
     } else if (mimeType.includes('csv')) {
       return await extractFromCSV(buffer);
     } else if (mimeType.includes('image')) {
-      return await extractFromImage(fileUrl);
+      throw new Error('Image OCR processing should be done on the client side');
     } else {
       throw new Error(`Unsupported file type: ${fileType}`);
     }
@@ -176,32 +175,7 @@ async function extractFromCSV(buffer: ArrayBuffer): Promise<ExtractedContent> {
   }
 }
 
-async function extractFromImage(imageUrl: string): Promise<ExtractedContent> {
-  try {
-    console.log('Starting OCR processing for image:', imageUrl);
-    
-    const worker = await createWorker('eng', 1, {
-      logger: (m) => console.log('OCR Progress:', m),
-    });
-    
-    const result = await worker.recognize(imageUrl);
-    
-    await worker.terminate();
-    
-    console.log('OCR completed successfully');
-    
-    return {
-      text: result.data.text,
-      metadata: {
-        type: 'image',
-        confidence: result.data.confidence,
-      },
-    };
-  } catch (error) {
-    console.error('Error in OCR processing:', error);
-    throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
+
 
 
 export async function processFileInBackground(

@@ -11,6 +11,8 @@ import { cn } from '@/app/lib/utils';
 import MessageComponent from '@/app/components/message';
 import ThinkingDots from '@/app/components/thinking-dots';
 import SkeletonLoader from '@/app/components/skeleton-loader';
+import { useImageOCR } from '@/app/components/image-ocr';
+import { CircularProgress, UploadProgressIndicator } from '@/app/components/circular-progress';
 
 interface UIMessage {
   _id: string;
@@ -26,7 +28,8 @@ interface UploadedFile {
   fileType: string;
   fileSize: number;
   url: string;
-  status: 'uploading' | 'processing' | 'completed' | 'failed';
+  status: 'uploading' | 'processing' | 'completed' | 'failed' | 'uploaded';
+  requiresClientOCR?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -50,12 +53,16 @@ export default function ChatInterface({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadingFiles, setUploadingFiles] = useState<{id: string, name: string, size: number}[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<{id: string, name: string, size: number, progress: number}[]>([]);
   const [deletingFiles, setDeletingFiles] = useState<string[]>([]);
+  const [processingOCR, setProcessingOCR] = useState<string[]>([]);
+  const [ocrProgress, setOcrProgress] = useState<Record<string, number>>({});
+  const [fileInputKey, setFileInputKey] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { processImage, isProcessing: isOCRProcessing } = useImageOCR();
 
   const [aiMessages, setAiMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -176,6 +183,14 @@ export default function ChatInterface({
     setShowScrollToBottom(!isAtBottom);
   };
 
+  const clearFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    // Force re-render of the input element by changing its key
+    setFileInputKey(prev => prev + 1);
+  };
+
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
         
@@ -183,7 +198,8 @@ export default function ChatInterface({
     const tempUploadingFiles = fileArray.map(file => ({
       id: `temp-${Date.now()}-${Math.random()}`,
       name: file.name,
-      size: file.size
+      size: file.size,
+      progress: 0
     }));
     
     setUploadingFiles(prev => [...prev, ...tempUploadingFiles]);
@@ -198,35 +214,81 @@ export default function ChatInterface({
       }
 
       try {
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const newFile: UploadedFile = {
-            id: data.file.id,
-            fileName: data.file.fileName,
-            fileType: data.file.fileType,
-            fileSize: data.file.fileSize,
-            url: data.file.url,
-            status: 'processing',
-          };
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
           
-          setUploadingFiles(prev => prev.filter(f => f.id !== tempId));
-          setUploadedFiles(prev => [...prev, newFile]);
-        } else {
-          console.error('Failed to upload file');
-          setError(new Error('Failed to upload file'));
-          setUploadingFiles(prev => prev.filter(f => f.id !== tempId));
-        }
+          // Track upload progress
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              setUploadingFiles(prev => 
+                prev.map(f => 
+                  f.id === tempId ? { ...f, progress } : f
+                )
+              );
+            }
+          });
+
+          // Handle completion
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                const newFile: UploadedFile = {
+                  id: data.file.id,
+                  fileName: data.file.fileName,
+                  fileType: data.file.fileType,
+                  fileSize: data.file.fileSize,
+                  url: data.file.url,
+                  status: data.file.status,
+                  requiresClientOCR: data.file.requiresClientOCR,
+                };
+                
+                setUploadingFiles(prev => prev.filter(f => f.id !== tempId));
+                setUploadedFiles(prev => [...prev, newFile]);
+
+                // If it's an image that requires client-side OCR, start processing
+                if (data.file.requiresClientOCR) {
+                  handleImageOCR(newFile);
+                }
+                
+                resolve();
+              } catch (parseError) {
+                console.error('Error parsing response:', parseError);
+                reject(new Error('Failed to parse server response'));
+              }
+            } else {
+              console.error('Upload failed with status:', xhr.status);
+              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+            }
+          });
+
+          // Handle errors
+          xhr.addEventListener('error', () => {
+            console.error('Network error during upload');
+            reject(new Error('Network error during upload'));
+          });
+
+          // Handle timeout
+          xhr.addEventListener('timeout', () => {
+            console.error('Upload timeout');
+            reject(new Error('Upload timeout'));
+          });
+
+          // Start the upload
+          xhr.open('POST', '/api/upload');
+          xhr.timeout = 60000; // 60 seconds timeout
+          xhr.send(formData);
+        });
       } catch (error) {
         console.error('Error uploading file:', error);
         setError(error instanceof Error ? error : new Error('Upload failed'));
         setUploadingFiles(prev => prev.filter(f => f.id !== tempId));
       }
     }
+
+    // Clear the file input after all uploads are complete
+    clearFileInput();
   };
 
   const handleFileDelete = async (fileId: string) => {
@@ -245,6 +307,8 @@ export default function ChatInterface({
       if (response.ok) {
         setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
         setDeletingFiles(prev => prev.filter(id => id !== fileId));
+        // Clear the file input to allow re-uploading the same file
+        clearFileInput();
       } else {
         console.error('Failed to delete file');
         setError(new Error('Failed to delete file. Please try again.'));
@@ -254,6 +318,96 @@ export default function ChatInterface({
       console.error('Error deleting file:', error);
       setError(error instanceof Error ? error : new Error('An error occurred while deleting the file.'));
       setDeletingFiles(prev => prev.filter(id => id !== fileId));
+    }
+  };
+
+  const handleImageOCR = async (file: UploadedFile) => {
+    try {
+      setProcessingOCR(prev => [...prev, file.id]);
+      setOcrProgress(prev => ({ ...prev, [file.id]: 0 }));
+      
+      // Update file status to processing
+      setUploadedFiles(prev => 
+        prev.map(f => 
+          f.id === file.id 
+            ? { ...f, status: 'processing' }
+            : f
+        )
+      );
+
+      // Process the image with OCR - create a custom progress tracking wrapper
+      const extractedText = await new Promise<string>((resolve, reject) => {
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+          progress = Math.min(progress + Math.random() * 15, 90);
+          setOcrProgress(prev => ({ ...prev, [file.id]: Math.round(progress) }));
+        }, 200);
+
+        processImage(file.url)
+          .then((text) => {
+            clearInterval(progressInterval);
+            setOcrProgress(prev => ({ ...prev, [file.id]: 100 }));
+            setTimeout(() => resolve(text), 300); // Brief delay to show 100%
+          })
+          .catch((error) => {
+            clearInterval(progressInterval);
+            reject(error);
+          });
+      });
+      
+      // Check if any text was extracted
+      if (!extractedText || extractedText.trim().length === 0) {
+        throw new Error('No text could be extracted from the image');
+      }
+      
+      // Send the extracted text to the server
+      const response = await fetch('/api/process-ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileId: file.id,
+          extractedText: extractedText.trim(),
+          metadata: {
+            type: 'image',
+            fileName: file.fileName,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        // Update file status to completed
+        setUploadedFiles(prev => 
+          prev.map(f => 
+            f.id === file.id 
+              ? { ...f, status: 'completed', requiresClientOCR: false }
+              : f
+          )
+        );
+      } else {
+        throw new Error('Failed to process extracted text');
+      }
+      
+    } catch (error) {
+      console.error('Error processing image OCR:', error);
+      setError(error instanceof Error ? error : new Error('Failed to process image'));
+      
+      // Update file status to failed
+      setUploadedFiles(prev => 
+        prev.map(f => 
+          f.id === file.id 
+            ? { ...f, status: 'failed' }
+            : f
+        )
+      );
+    } finally {
+      setProcessingOCR(prev => prev.filter(id => id !== file.id));
+      setOcrProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[file.id];
+        return newProgress;
+      });
     }
   };
 
@@ -272,6 +426,8 @@ export default function ChatInterface({
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileUpload(e.dataTransfer.files);
+      // Clear the file input to allow re-uploading the same files
+      clearFileInput();
     }
   };
 
@@ -383,11 +539,38 @@ export default function ChatInterface({
     return <FileIcon size={16} />;
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, fileId?: string) => {
+    const isProcessingOCRFile = fileId && processingOCR.includes(fileId);
+    const currentOcrProgress = fileId ? ocrProgress[fileId] || 0 : 0;
+    
+    if (isProcessingOCRFile) {
+      return (
+        <div className="flex items-center gap-2">
+          <CircularProgress 
+            progress={currentOcrProgress} 
+            size={24} 
+            strokeWidth={2}
+          />
+          {/* <span className="text-orange-400 text-xs font-medium">
+            OCR {currentOcrProgress}%
+          </span> */}
+        </div>
+      );
+    }
+    
     switch (status) {
       case 'uploading':
       case 'processing':
         return <Loader2 size={14} className="animate-spin text-blue-400" />;
+      case 'uploaded':
+        return (
+          <div className="flex items-center gap-1">
+            <CheckCircle size={12} className="text-yellow-400" />
+            <span className="text-yellow-400 text-xs font-medium">
+              Ready for OCR
+            </span>
+          </div>
+        );
       case 'completed':
         return <CheckCircle size={14} className="text-green-400" />;
       case 'failed':
@@ -518,21 +701,12 @@ export default function ChatInterface({
             <div className="max-w-4xl mx-auto">
               <div className="flex flex-wrap gap-2">
                 {uploadingFiles.map((file) => (
-                  <div
+                  <UploadProgressIndicator
                     key={file.id}
-                    className="flex items-center gap-2 bg-[#2f2f2f] rounded-lg px-3 py-2 text-sm border border-blue-500/30 animate-pulse"
-                  >
-                    <Loader2 size={16} className="animate-spin text-blue-400" />
-                    <span className="text-gray-300 max-w-[150px] truncate">
-                      {file.name}
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                      {formatFileSize(file.size)}
-                    </span>
-                    <span className="text-blue-400 text-xs font-medium">
-                      Uploading...
-                    </span>
-                  </div>
+                    fileName={file.name}
+                    progress={file.progress}
+                    isCompleted={file.progress >= 100}
+                  />
                 ))}
                 
                 {uploadedFiles.map((file) => {
@@ -560,8 +734,20 @@ export default function ChatInterface({
                           </span>
                         </div>
                       ) : (
-                        getStatusIcon(file.status)
+                        getStatusIcon(file.status, file.id)
                       )}
+                      
+                      {/* OCR button for uploaded images */}
+                      {file.status === 'uploaded' && file.requiresClientOCR && !processingOCR.includes(file.id) && (
+                        <button
+                          onClick={() => handleImageOCR(file)}
+                          className="ml-1 px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors"
+                          title="Process image text"
+                        >
+                          Extract Text
+                        </button>
+                      )}
+                      
                       <button
                         onClick={() => handleFileDelete(file.id)}
                         disabled={isDeleting}
@@ -590,6 +776,7 @@ export default function ChatInterface({
         <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto">
           <div className="chatgpt-input relative flex items-center">
             <input
+              key={fileInputKey}
               ref={fileInputRef}
               type="file"
               multiple

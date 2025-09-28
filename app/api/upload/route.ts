@@ -54,14 +54,25 @@ export async function POST(request: Request) {
       status: 'uploading',
     });
 
-    processFileInBackground(
-      fileRecord._id.toString(),
-      uploadResult.secure_url,
-      file.type,
-      userId
-    ).catch(error => {
-      console.error('Background processing error:', error);
-    });
+    // Check if it's an image file
+    const isImage = file.type.toLowerCase().includes('image');
+    
+    if (isImage) {
+      // For images, mark as uploaded and let client handle OCR
+      await File.findByIdAndUpdate(fileRecord._id, {
+        status: 'uploaded', // Special status for images that need client-side OCR
+      });
+    } else {
+      // For other files, process on server as usual
+      processFileInBackground(
+        fileRecord._id.toString(),
+        uploadResult.secure_url,
+        file.type,
+        userId
+      ).catch(error => {
+        console.error('Background processing error:', error);
+      });
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -71,7 +82,8 @@ export async function POST(request: Request) {
         fileType: fileRecord.fileType,
         fileSize: fileRecord.fileSize,
         url: fileRecord.cloudinaryUrl,
-        status: 'processing',
+        status: isImage ? 'uploaded' : 'processing',
+        requiresClientOCR: isImage,
       }
     });
   } catch (error) {
